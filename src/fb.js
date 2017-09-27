@@ -1,4 +1,4 @@
-var FB = require('src/fb');
+var FB = require('fb');
 
 let fb = new FB.Facebook({
     appId: process.env.FACEBOOK_APPID,

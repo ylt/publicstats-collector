@@ -1,4 +1,4 @@
-const Influx = require('src/influx');
+const Influx = require('influx');
 
 let influx = new Influx.InfluxDB({
     host: process.env.INFLUX_HOST,

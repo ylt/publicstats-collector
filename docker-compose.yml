@@ -2,6 +2,6 @@ version: "3"
 services:
   collector:
     build: collector
-    env_file: ./collector/config.env
+    env_file: config.env
     environment:
       ITX_MONITOR: 'true'
