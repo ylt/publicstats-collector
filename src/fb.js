@@ -9,16 +9,18 @@ let fb = new FB.Facebook({
 const influx = require('./influx');
 
 function scrape(pagename, name) {
-    fb.api(pagename, {fields: [
-        'id',
-        'name',
-        'fan_count',
-        'were_here_count',
-        'rating_count',
-        'talking_about_count',
-        'checkins',
-        'overall_star_rating'
-    ]}, resDetails => {
+    fb.api(pagename, {
+        fields: [
+            'id',
+            'name',
+            'fan_count',
+            'were_here_count',
+            'rating_count',
+            'talking_about_count',
+            'checkins',
+            'overall_star_rating'
+        ]
+    }, resDetails => {
         let info = {
             likes: resDetails.fan_count,
             visitors: resDetails.were_here_count,
@@ -34,57 +36,64 @@ function scrape(pagename, name) {
 
         fb.api(pagename + '/insights', {metric: ['page_fans_country', 'page_storytellers_by_country']}, res_insights => {
             //console.log(res_insights);
-            for (let collection of res_insights.data) {
-                let field = '';
-                if (collection.name == 'page_fans_country') {
-                    field = 'likes';
-                }
-                else {
-                    field = 'mentions_' + collection.period.replace('days_28', 'month');
-                }
-                let sets = collection.values.filter(set => set.value);
-                let set = sets[sets.length - 1];
+            let series = [];
 
-                if (!set)
-                    continue;
+            if (res_insights) {
+                for (let collection of res_insights.data) {
+                    let field = '';
+                    if (collection.name == 'page_fans_country') {
+                        field = 'likes';
+                    }
+                    else {
+                        field = 'mentions_' + collection.period.replace('days_28', 'month');
+                    }
+                    let sets = collection.values.filter(set => set.value);
+                    let set = sets[sets.length - 1];
 
-                //aggregate mentions into total
-                if (collection.name == 'page_storytellers_by_country') {
+                    if (!set)
+                        continue;
+
+                    //aggregate mentions into total
+                    if (collection.name == 'page_storytellers_by_country') {
+                        for (let country in set.value) {
+                            let val = set.value[country];
+                            info[field] += val;
+                        }
+                    }
+
+                    //per country inf
                     for (let country in set.value) {
                         let val = set.value[country];
-                        info[field] += val;
+                        if (!(country in countryinf)) {
+                            countryinf[country] = {likes: 0, mentions_day: 0, mentions_week: 0, mentions_month: 0};
+                        }
+                        countryinf[country][field] = val;
                     }
                 }
-
-                //per country inf
-                for (let country in set.value) {
-                    let val = set.value[country];
-                    if (!(country in countryinf)) {
-                        countryinf[country] = {likes: 0, mentions_day: 0, mentions_week: 0, mentions_month: 0};
-                    }
-                    countryinf[country][field] = val;
+                for (let country in countryinf) {
+                    let inf = countryinf[country];
+                    series.push({
+                        measurement: 'facebook_country',
+                        fields: inf,
+                        tags: {'page': pagename, country: country}
+                    });
                 }
+            }
+            else {
+                console.error('fb', res_insights);
             }
 
             //the info is now organised, we can now generate the series
             //console.log(countryinf);
             //console.log(info);
 
-            let series = [];
+
             series.push({
                 measurement: 'facebook',
                 fields: info,
                 tags: {'page': pagename}
             });
 
-            for (let country in countryinf) {
-                let inf = countryinf[country];
-                series.push({
-                    measurement: 'facebook_country',
-                    fields: inf,
-                    tags: {'page': pagename, country: country}
-                });
-            }
 
             //console.log(series);
             influx.writePoints(series);
