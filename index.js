@@ -7,3 +7,5 @@ require('./src/monzocurrent');
 require('./src/discourse');
 require('./src/fb');
 require('./src/twitter');
+require('./src/googleplay');
+require('./src/appstore');

@@ -9,9 +9,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "app-store-scraper": "^0.7.0",
+    "aso": "^1.0.0",
     "cron": "^1.3.0",
     "fb": "^2.0.0",
     "fb_promise": "^0.1.0",
+    "google-play-scraper": "^3.3.1",
+    "googleapis": "^22.1.0",
     "influx": "^5.0.7",
     "lodash": "^4.17.4",
     "log-timestamp": "^0.1.2",

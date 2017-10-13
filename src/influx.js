@@ -145,6 +145,92 @@ let influx = new Influx.InfluxDB({
                 sentiment_norm: Influx.FieldType.FLOAT,
                 sentiment_comp: Influx.FieldType.FLOAT,
             }
+        },
+        {
+            measurement: 'googleplay_search',
+            tags: [
+                'query',
+                'appId',
+                'country'
+            ],
+            fields: {
+                score: Influx.FieldType.FLOAT,
+                index: Influx.FieldType.INTEGER
+            }
+        },
+        {
+            measurement: 'googleplay_app',
+            tags: [
+                'appId'
+            ],
+            fields: {
+                minInstalls: Influx.FieldType.INTEGER,
+                maxInstalls: Influx.FieldType.INTEGER,
+                reviews: Influx.FieldType.INTEGER,
+                score: Influx.FieldType.FLOAT
+            }
+        },
+        {
+            measurement: 'googleplay_app_histogram',
+            tags: [
+                'appId',
+                'stars'
+            ],
+            fields: {
+                ratings: Influx.FieldType.INTEGER
+            }
+        },
+        {
+            measurement: 'googleplay_app_release',
+            tags: [
+                'appId',
+                'version'
+            ],
+            fields: {
+                androidVersion: Influx.FieldType.STRING,
+                changed: Influx.FieldType.STRING
+            }
+        },
+        {
+            measurement: 'appstore_search',
+            tags: [
+                'query',
+                'appId',
+                'country',
+                'title'
+            ],
+            fields: {
+                score: Influx.FieldType.FLOAT,
+                index: Influx.FieldType.INTEGER
+            }
+        },
+        {
+            measurement: 'appstore_app',
+            tags: [
+                'appId',
+                'version',
+                'title'
+            ],
+            fields: {
+                size: Influx.FieldType.INTEGER,
+                reviews: Influx.FieldType.INTEGER,
+                currentVersionReviews: Influx.FieldType.INTEGER,
+                score: Influx.FieldType.FLOAT,
+                currentVersionScore: Influx.FieldType.FLOAT
+            }
+        },
+        {
+            measurement: 'appstore_app_release',
+            tags: [
+                'appId',
+                'version',
+                'title'
+            ],
+            fields: {
+                size: Influx.FieldType.INTEGER,
+                iosVersion: Influx.FieldType.STRING,
+                changed: Influx.FieldType.STRING
+            }
         }
     ]
 });

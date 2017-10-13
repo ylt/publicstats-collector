@@ -2,31 +2,34 @@
  * Created by joe on 12/10/17.
  */
 const influx = require('./influx');
-const gps = require('google-play-scraper');
+const aps = require('app-store-scraper');
 const _ = require('lodash');
 const moment = require('moment');
 
 async function search(term, country) {
 
-    let results = await gps.search({
+    let results = await aps.search({
         term: term,
-        num: 50,
-        lang: 'en',
+        num: 100,
+        device: aps.device.ALL,
         country: country
     });
+
+    // console.log(results);
 
     let series = [];
     let i = 1;
     for (let result of results) {
         let point = {
-            measurement: 'googleplay_search',
+            measurement: 'appstore_search',
             tags: {
                 query: term,
                 appId: result.appId,
-                country: country
+                country: country,
+                title: result.title
             },
             fields: {
-                score: result.score,
+                score: result.score || 0,
                 index: i
             }
         }
@@ -36,82 +39,95 @@ async function search(term, country) {
     }
 
     influx.writePoints(series);
+    // console.log(series);
 }
 
 async function fetchInfo(appId) {
     let series = [];
 
-    let info = await gps.app({
-        appId: appId,
+    let q = {
         country: 'gb',
         lang: 'en-gb'
-    });
+    }
 
-    console.log(info);
+    if (Number.isInteger(appId))
+        q.id = appId;
+    else
+        q.appId = appId;
+
+    let info = await aps.app(q);
+
+    appId = info.appId;
 
     series.push({
-        measurement: 'googleplay_app',
+        measurement: 'appstore_app',
         tags: {
-            appId
+            appId,
+            version: info.version,
+            title: info.title
         },
         fields: {
-            minInstalls: info.minInstalls,
-            maxInstalls: info.maxInstalls,
-            reviews: info.reviews,
-            score: info.score
+            size: info.size,
+            reviews: info.reviews || 0,
+            currentVersionReviews: info.currentVersionReviews || 0,
+            score: info.score || 0,
+            currentVersionScore: info.currentVersionScore || 0
         }
     });
 
-    for (let i = 1; i <= 5; i++) {
-        series.push({
-            measurement: 'googleplay_app_histogram',
-            tags: {
-                appId,
-                stars: i
-            },
-            fields: {
-                ratings: info.histogram[i.toString()]
-            }
-        });
-    }
-
     series.push({
-        measurement: 'googleplay_app_release',
+        measurement: 'appstore_app_release',
         tags: {
             appId,
-            version: info.version
+            version: info.version,
+            title: info.title
         },
         fields: {
-            androidVersion: info.androidVersion,
-            changed: info.recentChanges.join("\n")
+            size: info.size,
+            iosVersion: info.requiredOsVersion,
+            changed: info.releaseNotes || ""
         },
-        timestamp: moment(info.updated, 'DD MMMM YYYY').toDate()
+        timestamp: moment(info.updated).toDate()
     })
 
     influx.writePoints(series);
-
-
 }
 
+// let banks = [
+    // 'co.uk.getmondo',
+    // 'com.atombank.release',
+    // 'com.bunq.android',
+    // 'com.holvi.app',
+    // 'com.imaginecurve.curve.prd',
+    // 'com.monese.monese.live',
+    // 'com.pockit.mobile.android',
+    // 'com.revolut.revolut',
+    // 'com.starlingbank.android',
+    // 'com.tideplatform.banking',
+    // 'com.transferwise.android',
+    // 'de.number26.android',
+    // 'io.loot.lootapp',
+    // 'uk.co.tandem.android.app',
+    // 'uk.uaccount.android'
+// ];
+
 let banks = [
-    'co.uk.getmondo',
-    'com.atombank.release',
-    'com.bunq.android',
-    'com.holvi.app',
-    'com.imaginecurve.curve.prd',
-    'com.monese.monese.live',
-    'com.pockit.mobile.android',
-    'com.revolut.revolut',
-    'com.starlingbank.android',
-    'com.tideplatform.banking',
-    'com.transferwise.android',
-    'de.number26.android',
-    'io.loot.lootapp',
-    'uk.co.tandem.android.app',
-    'uk.uaccount.android'
-];
-
-
+    1052238659, //monzo
+    1085637839, //atom
+    1021178150, //bunq
+    1006642625, //holvi
+    1049397112, //curve
+    1102793407, //monese
+    1022334791, //pockit
+    932493382, //revolut
+    956806430, //starling
+    1140086177, //tide
+    612261027, //transferwise
+    956857223, //n26
+    1010828489, //loot
+    1128467665, //tandem
+    1224502407 //uaccount
+]
 
 
 const cron = require('cron');
@@ -123,13 +139,13 @@ new CronJob({ //every 5 mins
     start: true,
     runOnInit: true,
     onTick: function () {
-        console.log('Fetching Google play');
+        console.log('Fetching App store');
 
         search('bank', 'gb');
         let p = Promise.resolve(null);
         for (let bank of banks) {
             ((bank) => {
-                p.then(() => {
+                p = p.then(() => {
                     fetchInfo(bank);
                 })
             })(bank);
@@ -137,4 +153,3 @@ new CronJob({ //every 5 mins
 
     }
 });
-
