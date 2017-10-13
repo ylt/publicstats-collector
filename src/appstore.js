@@ -146,8 +146,8 @@ new CronJob({ //every 5 mins
         for (let bank of banks) {
             ((bank) => {
                 p = p.then(() => {
-                    fetchInfo(bank);
-                })
+                    return fetchInfo(bank);
+                });
             })(bank);
         }
 
