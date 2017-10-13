@@ -38,7 +38,7 @@ function scrape(pagename, name) {
             //console.log(res_insights);
             let series = [];
 
-            if (res_insights) {
+            if (res_insights.data) {
                 for (let collection of res_insights.data) {
                     let field = '';
                     if (collection.name == 'page_fans_country') {
