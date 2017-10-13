@@ -7,6 +7,7 @@ const influx = require('./influx');
 const geohash = require('ngeohash');
 const _ = require('lodash');
 const sentiment = require('sentiment');
+const querystring = require('querystring');
 
 var T = new Twit({
     consumer_key: process.env.TWITTER_CONSUMER_KEY,
@@ -126,83 +127,110 @@ function doMentions() {
         return bank.toLowerCase();
     })
 
-    function search(query) {
-        T.get('search/tweets', {q: query, result_type: 'recent', tweet_mode: 'extended', count: 100,}).then(res => {
-            // console.log(JSON.stringify(res.data, null, ' '));
+    function process(query, res) {
+        let series = [];
 
-            let series = [];
+        for (status of res.data.statuses) {
+            let text = status.full_text;
 
-            for (status of res.data.statuses) {
-                let text = status.full_text;
+            if (status.user.screen_name.toLowerCase() in banks_lower)
+                continue;
 
-                if (status.user.screen_name.toLowerCase() in banks_lower)
-                    continue;
+            let sent = sentiment(text);
+            let num = sent.positive.length + sent.negative.length;
+            let norm = 0;
+            if (num > 0)
+                norm = sent.score / (num);
 
-                let sent = sentiment(text);
-                let num = sent.positive.length + sent.negative.length;
-                let norm = 0;
-                if (num > 0)
-                    norm = sent.score / (num);
+            let date = moment(status.created_at, 'ddd MMM D HH:mm:ss Z YYYY');
 
-                let date = moment(status.created_at, 'ddd MMM D HH:mm:ss Z YYYY');
-
-                let point = null;
-                if (status.geo && status.geo.type == 'Point') {
-                    point = geohash.encode(status.geo.coordinates[1], status.geo.coordinates[0]);
-                }
-
-                let fields = {
-                    text: text,
-                    favorite_count: status.favorite_count,
-                    retweet_count: status.retweet_count,
-                    geo: point,
-                    isReply: !!status.in_reply_to_status_id,
-                    isQuote: !!status.is_quote_status,
-                    hasMedia: !!status.entities.media,
-                    hasMention: !!status.entities.user_mentions && status.entities.user_mentions.length > 0,
-                    tags: '',
-                    sentiment: sent.score,
-                    sentiment_norm: norm,
-                    sentiment_comp: sent.comparative,
-                };
-
-                let tags = [];
-
-                if (fields.isReply)
-                    tags.push('reply');
-                if (fields.isQuote)
-                    tags.push('quote');
-                if (fields.hasMedia)
-                    tags.push('media');
-                if (fields.hasMention)
-                    tags.push('mention');
-
-                fields.tags = tags.join(',');
-
-                series.push({
-                    measurement: 'twitter_mention',
-                    tags: {
-                        profile: status.user.screen_name,
-                        id: status.id_str,
-                        name: status.user.name,
-                        tweet_id: status.id,
-                        query: query
-                    },
-                    fields: fields,
-                    timestamp: date.toDate()
-                });
-
-                // console.log(ml.classify(text), sent.score, norm, sent.comparative, text);
-
+            let point = null;
+            if (status.geo && status.geo.type == 'Point') {
+                point = geohash.encode(status.geo.coordinates[1], status.geo.coordinates[0]);
             }
 
-            // console.log(series);
-            influx.writePoints(series);
+            let fields = {
+                text: text,
+                favorite_count: status.favorite_count,
+                retweet_count: status.retweet_count,
+                geo: point,
+                isReply: !!status.in_reply_to_status_id,
+                isQuote: !!status.is_quote_status,
+                hasMedia: !!status.entities.media,
+                hasMention: !!status.entities.user_mentions && status.entities.user_mentions.length > 0,
+                tags: '',
+                sentiment: sent.score,
+                sentiment_norm: norm,
+                sentiment_comp: sent.comparative,
+            };
+
+            let tags = [];
+
+            if (fields.isReply)
+                tags.push('reply');
+            if (fields.isQuote)
+                tags.push('quote');
+            if (fields.hasMedia)
+                tags.push('media');
+            if (fields.hasMention)
+                tags.push('mention');
+
+            fields.tags = tags.join(',');
+
+            series.push({
+                measurement: 'twitter_mention',
+                tags: {
+                    profile: status.user.screen_name,
+                    id: status.id_str,
+                    name: status.user.name,
+                    tweet_id: status.id,
+                    query: query
+                },
+                fields: fields,
+                timestamp: date.toDate()
+            });
+
+            // console.log(ml.classify(text), sent.score, norm, sent.comparative, text);
+
+        }
+
+        // console.log(series);
+        influx.writePoints(series);
+    }
+
+    function search(query, params) {
+        if (!params)
+            params = {};
+
+        T.get('search/tweets', _.merge({}, params, {q: query, result_type: 'recent', tweet_mode: 'extended', count: 100})).then(res => {
+            // console.log(JSON.stringify(res.data, null, ' '));
+            process(query, res);
+            //
+            // if (res.data.search_metadata && res.data.search_metadata.max_id_str) {
+            //     let pagenum = 1;
+            //     if (params.pagenum)
+            //         pagenum = params.pagenum+1;
+            //
+            //     let status = res.data.statuses[0];
+            //     let date = moment(status.created_at, 'ddd MMM D HH:mm:ss Z YYYY');
+            //     console.log(status);
+            //
+            //     if (date.isAfter('2017-09-22')) {
+            //         console.log('fetching next page ', query, pagenum);
+            //         let qs = querystring.parse(res.data.search_metadata.next_results.substring(1));
+            //         let maxid = qs.max_id;
+            //
+            //         search(query, _.merge({}, params, {max_id: maxid, pagenum: pagenum}))
+            //     }
+            // }
+
         });
     }
 
+    // search('@monzo');
+
     for (let bank of banks) {
-        search('@' + bank);
+         search('@' + bank);
     }
 }
 
@@ -246,7 +274,7 @@ new CronJob({ //every 5 mins
     }
 });
 
-if (process.env.ITX_MONITOR == true) {
+if (process.env.ITX_MONITOR == 'true') {
     new CronJob({ //every hour
         cronTime: '0 0 * * * *',
         start: true,
@@ -257,3 +285,5 @@ if (process.env.ITX_MONITOR == true) {
         }
     });
 }
+
+// doMentions();
