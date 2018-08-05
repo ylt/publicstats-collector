@@ -47,7 +47,7 @@ async function fetchInfo(appId) {
         lang: 'en-gb'
     });
 
-    // console.log(info);
+    //console.log(info);
 
     series.push({
         measurement: 'googleplay_app',
@@ -113,28 +113,29 @@ let banks = [
 
 
 
+//
+ const cron = require('cron');
+ var CronJob = require('cron').CronJob;
+//
+// // secs mins hrs dom mo dow
+ new CronJob({ //every 5 mins
+     cronTime: '0 */30 * * * *',
+     start: true,
+     runOnInit: true,
+     onTick: function () {
+         console.log('Fetching Google play');
 
-const cron = require('cron');
-var CronJob = require('cron').CronJob;
+         let p = search('bank', 'gb');
+         for (let bank of banks) {
+             ((bank) => {
+                 p = p.then(() => {
+                     console.log('gplay: fetching ', bank);
+                     return fetchInfo(bank);
+                 });
+             })(bank);
+         }
 
-// secs mins hrs dom mo dow
-new CronJob({ //every 5 mins
-    cronTime: '0 */30 * * * *',
-    start: true,
-    runOnInit: true,
-    onTick: function () {
-        console.log('Fetching Google play');
-
-        search('bank', 'gb');
-        let p = Promise.resolve(null);
-        for (let bank of banks) {
-            ((bank) => {
-                p = p.then(() => {
-                    return fetchInfo(bank);
-                });
-            })(bank);
-        }
-
-    }
+   }
 });
 
+//fetchInfo('co.uk.getmondo');

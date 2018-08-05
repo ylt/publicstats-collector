@@ -2,9 +2,11 @@ const Influx = require('influx');
 
 let influx = new Influx.InfluxDB({
     host: process.env.INFLUX_HOST,
+    port: process.env.INFLUX_PORT || 8086,
     database: process.env.INFLUX_DATABASE,
     username: process.env.INFLUX_USERNAME,
     password: process.env.INFLUX_PASSWORD,
+    protocol: process.env.INFLUX_PROTOCOL || 'http',
     schema: [
         {
             measurement: 'monzo_currentacc',
